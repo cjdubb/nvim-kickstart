@@ -66,6 +66,8 @@ return {
                 return c.id == client.id
               end,
             }
+
+            vim.cmd('Neoformat')
           end,
         })
       end,
