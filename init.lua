@@ -1,46 +1,3 @@
---[[
-
-=====================================================================
-==================== READ THIS BEFORE CONTINUING ====================
-=====================================================================
-
-Kickstart.nvim is *not* a distribution.
-
-Kickstart.nvim is a template for your own configuration.
-  The goal is that you can read every line of code, top-to-bottom, understand
-  what your configuration is doing, and modify it to suit your needs.
-
-  Once you've done that, you should start exploring, configuring and tinkering to
-  explore Neovim!
-
-  If you don't know anything about Lua, I recommend taking some time to read through
-  a guide. One possible example:
-  - https://learnxinyminutes.com/docs/lua/
-
-
-  And then you can explore or search through `:help lua-guide`
-  - https://neovim.io/doc/user/lua-guide.html
-
-
-Kickstart Guide:
-
-I have left several `:help X` comments throughout the init.lua
-You should run that command and read that help section for more information.
-
-In addition, I have some `NOTE:` items throughout the file.
-These are for you, the reader to help understand what is happening. Feel free to delete
-them once you know what you're doing, but they should serve as a guide for when you
-are first encountering a few different constructs in your nvim config.
-
-I hope you enjoy your Neovim journey,
-- TJ
-
-P.S. You can delete this when you're done too. It's your config now :)
---]]
-
--- Set <space> as the leader key
--- See `:help mapleader`
---  NOTE: Must happen before plugins are required (otherwise wrong leader will be used)
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
@@ -69,13 +26,13 @@ vim.keymap.set("n", "<C-u>", "<C-u>zz")
 vim.keymap.set({ "n", "v" }, "<leader>d", [["_d]])
 
 -- Clear search highlighting
-vim.keymap.set("n", "<leader>hh", vim.cmd.noh)
+vim.keymap.set("n", "<leader>h", vim.cmd.noh)
 
 -- Run http request under cursor
 vim.keymap.set("n", "<leader>r", "<Plug>RestNvim")
 
 -- Open trouble
-vim.keymap.set("n", "<leader>tt", vim.cmd.Trouble)
+vim.keymap.set("n", "<leader>tt", vim.cmd.TroubleToggle)
 
 -- Open todo using trouble window
 vim.keymap.set("n", "<leader>td", vim.cmd.TodoTrouble)
@@ -100,6 +57,40 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
+local highlight = {
+  "RainbowRed",
+  "RainbowYellow",
+  "RainbowBlue",
+  "RainbowOrange",
+  "RainbowGreen",
+  "RainbowViolet",
+  "RainbowCyan",
+}
+
+-- Telescope live_grep in git root
+-- Function to find the git root directory based on the current buffer's path
+local function find_git_root()
+  -- Use the current buffer's path as the starting point for the git search
+  local current_file = vim.api.nvim_buf_get_name(0)
+  local current_dir
+  local cwd = vim.fn.getcwd()
+  -- If the buffer is not associated with a file, return nil
+  if current_file == "" then
+    current_dir = cwd
+  else
+    -- Extract the directory from the current file's path
+    current_dir = vim.fn.fnamemodify(current_file, ":h")
+  end
+
+  -- Find the Git root directory from the current file's path
+  local git_root = vim.fn.systemlist("git -C " .. vim.fn.escape(current_dir, " ") .. " rev-parse --show-toplevel")[1]
+  if vim.v.shell_error ~= 0 then
+    print("Not a git repository. Searching on current working directory")
+    return cwd
+  end
+  return git_root
+end
+
 -- [[ Configure plugins ]]
 -- NOTE: Here is where you install your plugins.
 --  You can configure plugins using the `config` key.
@@ -108,13 +99,42 @@ vim.opt.rtp:prepend(lazypath)
 --    as they will be available in your neovim runtime.
 require('lazy').setup({
   -- NOTE: First, some plugins that don't require any configuration
-
   -- Git related plugins
   'tpope/vim-fugitive',
   'tpope/vim-rhubarb',
-
+  'tpope/vim-speeddating',
+  'wellle/targets.vim',
   -- Detect tabstop and shiftwidth automatically
   'tpope/vim-sleuth',
+  {
+    'mxsdev/nvim-dap-vscode-js',
+    dependencies = {
+      'mfussenegger/nvim-dap'
+    },
+    opts = {
+      adapters = { 'pwa-node' }
+    }
+  },
+  {
+    { -- Add indentation guides even on blank lines
+      'lukas-reineke/indent-blankline.nvim',
+      -- Enable `lukas-reineke/indent-blankline.nvim`
+      -- See `:help ibl`
+      main = 'ibl',
+      commit = "29be0919b91fb59eca9e90690d76014233392bef",
+      opts = {},
+    },
+  },
+  {
+    "andrewferrier/debugprint.nvim",
+    opts = {},
+    dependencies = {
+      "echasnovski/mini.nvim" -- Needed to enable :ToggleCommentDebugPrints for NeoVim <= 0.9
+    },
+    -- Remove the following line to use development versions,
+    -- not just the formal releases
+    version = "*"
+  },
 
   -- NOTE: This is where your plugins related to LSP can be installed.
   --  The configuration is done below. Search for lspconfig to find it below.
@@ -212,6 +232,21 @@ require('lazy').setup({
     "folke/todo-comments.nvim",
     dependencies = { "nvim-lua/plenary.nvim" },
     opts = {
+      keywords = {
+        FIX = {
+          icon = " ", -- icon used for the sign, and in search results
+          color = "error", -- can be a hex color, or a named color (see below)
+          alt = { "FIXME", "BUG", "FIXIT", "ISSUE" }, -- a set of other keywords that all map to this FIX keywords
+          -- signs = false, -- configure signs for some keywords individually
+        },
+        TODO = { icon = " ", color = "info" },
+        QUESTION = { icon = "?", color = "#14b33e" },
+        HACK = { icon = " ", color = "warning" },
+        WARN = { icon = " ", color = "warning", alt = { "WARNING", "XXX" } },
+        PERF = { icon = " ", alt = { "OPTIM", "PERFORMANCE", "OPTIMIZE" } },
+        NOTE = { icon = " ", color = "hint", alt = { "INFO" } },
+        TEST = { icon = "⏲ ", color = "test", alt = { "TESTING", "PASSED", "FAILED" } },
+      },
       -- your configuration comes here
       -- or leave it empty to use the default settings
       -- refer to the configuration section below
@@ -278,31 +313,27 @@ require('lazy').setup({
       vim.cmd.colorscheme 'onedark'
     end,
   },
-
   {
     -- Set lualine as statusline
     'nvim-lualine/lualine.nvim',
     -- See `:help lualine.txt`
     opts = {
+      sections = {
+        lualine_a = { 'mode' },
+        lualine_b = { 'FugitiveHead', 'FugitiveGitDir', 'branch', 'diff', 'diagnostics' },
+        lualine_c = { 'filename' },
+        lualine_x = { 'encoding', 'fileformat', 'filetype' },
+        lualine_y = { 'progress' },
+        lualine_z = { 'location' }
+      },
       options = {
-        icons_enabled = false,
+        icons_enabled = true,
         theme = 'onedark',
         component_separators = '|',
         section_separators = '',
       },
     },
   },
-
-  {
-    -- Add indentation guides even on blank lines
-    'lukas-reineke/indent-blankline.nvim',
-    -- Enable `lukas-reineke/indent-blankline.nvim`
-    -- See `:help ibl`
-    main = 'ibl',
-    opts = {},
-  },
-
-  -- "gc" to comment visual regions/lines
   { 'numToStr/Comment.nvim', opts = {} },
 
   -- Fuzzy Finder (files, lsp, etc)
@@ -340,7 +371,6 @@ require('lazy').setup({
   --       Uncomment any of the lines below to enable them.
   require 'kickstart.plugins.autoformat',
   -- require 'kickstart.plugins.debug',
-
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    You can use this folder to prevent any conflicts with this init.lua if you're interested in keeping
   --    up-to-date with whatever is in the kickstart repo.
@@ -377,6 +407,10 @@ vim.o.breakindent = true
 -- Save undo history
 vim.o.undofile = true
 vim.g.netrw_banner = 0
+
+
+vim.o.cursorline = true
+vim.o.cursorcolumn = true
 
 -- Case-insensitive searching UNLESS \C or capital in search
 vim.o.ignorecase = true
@@ -421,10 +455,46 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   group = highlight_group,
   pattern = '*',
 })
+local highlight = {
+  "RainbowRed",
+  "RainbowYellow",
+  "RainbowBlue",
+  "RainbowOrange",
+  "RainbowGreen",
+  "RainbowViolet",
+  "RainbowCyan",
+}
+local hooks = require "ibl.hooks"
+-- create the highlight groups in the highlight setup hook, so they are reset
+-- every time the colorscheme changes
+hooks.register(hooks.type.HIGHLIGHT_SETUP, function()
+  vim.api.nvim_set_hl(0, "RainbowRed", { fg = "#E06C75" })
+  vim.api.nvim_set_hl(0, "RainbowYellow", { fg = "#E5C07B" })
+  vim.api.nvim_set_hl(0, "RainbowBlue", { fg = "#61AFEF" })
+  vim.api.nvim_set_hl(0, "RainbowOrange", { fg = "#D19A66" })
+  vim.api.nvim_set_hl(0, "RainbowGreen", { fg = "#98C379" })
+  vim.api.nvim_set_hl(0, "RainbowViolet", { fg = "#C678DD" })
+  vim.api.nvim_set_hl(0, "RainbowCyan", { fg = "#56B6C2" })
+end)
 
+vim.g.rainbow_delimiters = { highlight = highlight }
+require("ibl").setup { scope = { highlight = highlight } }
+
+hooks.register(hooks.type.SCOPE_HIGHLIGHT, hooks.builtin.scope_highlight_from_extmark)
 -- [[ Configure Telescope ]]
 -- See `:help telescope` and `:help telescope.setup()`
 require('telescope').setup {
+
+  pickers = {
+    buffers = {
+      show_all_buffers = true,
+      sort_mru = true,
+      ignore_current_buffer = true,
+    },
+    find_files = {
+      hidden = true
+    }
+  },
   defaults = {
     mappings = {
       i = {
@@ -438,29 +508,6 @@ require('telescope').setup {
 -- Enable telescope fzf native, if installed
 pcall(require('telescope').load_extension, 'fzf')
 
--- Telescope live_grep in git root
--- Function to find the git root directory based on the current buffer's path
-local function find_git_root()
-  -- Use the current buffer's path as the starting point for the git search
-  local current_file = vim.api.nvim_buf_get_name(0)
-  local current_dir
-  local cwd = vim.fn.getcwd()
-  -- If the buffer is not associated with a file, return nil
-  if current_file == "" then
-    current_dir = cwd
-  else
-    -- Extract the directory from the current file's path
-    current_dir = vim.fn.fnamemodify(current_file, ":h")
-  end
-
-  -- Find the Git root directory from the current file's path
-  local git_root = vim.fn.systemlist("git -C " .. vim.fn.escape(current_dir, " ") .. " rev-parse --show-toplevel")[1]
-  if vim.v.shell_error ~= 0 then
-    print("Not a git repository. Searching on current working directory")
-    return cwd
-  end
-  return git_root
-end
 
 -- Custom live_grep function to search in git root
 local function live_grep_git_root()
@@ -632,13 +679,36 @@ require('mason-lspconfig').setup()
 --  If you want to override the default filetypes that your language server will attach to you can
 --  define the property 'filetypes' to the map in question.
 local servers = {
+  cmake = {
+    filetypes = {
+      "CMakeLists.txt", "cmake"
+    }
+  },
   -- clangd = {},
   -- gopls = {},
-  -- pyright = {},
-  -- rust_analyzer = {},
+  pyright = {},
+  rust_analyzer = {
+    diagnostics = {
+      enable = true
+    }
+  },
   -- tsserver = {},
   -- html = { filetypes = { 'html', 'twig', 'hbs'} },
 
+  yamlls = {
+    yaml = {
+      format = {
+        enable = true
+      },
+      schemaStore = {
+        enable = true,
+        url = "https://www.schemastore.org/api/json/catalog.json"
+      }
+    }
+  },
+  jedi_language_server = {},
+  pylsp = {},
+  pyright = {},
   lua_ls = {
     Lua = {
       workspace = { checkThirdParty = false },
@@ -671,6 +741,25 @@ mason_lspconfig.setup_handlers {
     }
   end,
 }
+
+for _, language in ipairs({ "typescript", "javascript" }) do
+  require('dap').configurations[language] = {
+    {
+      type = "pwa-node",
+      request = "launch",
+      name = "Launch file",
+      program = "${file}",
+      cwd = "${workspaceFolder}",
+    },
+    {
+      type = "pwa-node",
+      request = "attach",
+      name = "Attach",
+      processId = require 'dap.utils'.pick_process,
+      cwd = "${workspaceFolder}",
+    }
+  }
+end
 
 -- [[ Configure nvim-cmp ]]
 -- See `:help cmp`
