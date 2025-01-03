@@ -692,7 +692,7 @@ local servers = {
       enable = true
     }
   },
-  -- tsserver = {},
+  -- ts_ls = {},
   -- html = { filetypes = { 'html', 'twig', 'hbs'} },
 
   yamlls = {
